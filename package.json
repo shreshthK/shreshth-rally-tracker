@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:build:app": "tauri build --bundles app --no-sign",
+    "dmg:simple": "bash scripts/create-dmg.sh",
+    "release:dmg": "npm run tauri:build:app && npm run dmg:simple"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

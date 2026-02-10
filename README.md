@@ -54,6 +54,25 @@ npm run tauri dev
 npm run tauri build
 ```
 
+## Create DMG (recommended)
+
+Use the fallback flow that avoids `bundle_dmg.sh` / Finder AppleScript issues:
+
+```bash
+npm run release:dmg
+```
+
+This runs:
+
+1. `npm run tauri:build:app` (builds `.app` only)
+2. `npm run dmg:simple` (packages a DMG with `hdiutil`)
+
+Output file:
+
+- `src-tauri/target/release/bundle/dmg/Rally Notifier_0.1.0_aarch64.dmg`
+
+Upload that `.dmg` to GitHub Releases to distribute.
+
 ## Notes
 
 - Polling-first architecture: no webhook dependency.
