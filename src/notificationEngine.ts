@@ -1,5 +1,13 @@
+import { invoke } from "@tauri-apps/api/core";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import type { TestingRequiredStoryRef } from "./types";
+
+const TEAMS_PROXY_ENDPOINT = "/__teams_proxy";
+
+interface HttpResponse {
+  status: number;
+  body: string;
+}
 
 export class NotificationEngine {
   private permissionReady = false;
@@ -53,6 +61,39 @@ export class NotificationEngine {
     }
   }
 
+  async notifyTeamsTestingRequiredChange(
+    addedStories: TestingRequiredStoryRef[],
+    removedStories: TestingRequiredStoryRef[],
+    teamsWebhookUrl?: string
+  ): Promise<void> {
+    const webhookUrl = teamsWebhookUrl?.trim();
+    if (!webhookUrl) {
+      return;
+    }
+
+    const messages: string[] = [];
+    for (const story of addedStories) {
+      messages.push(`${story.formattedId} is ready for validation.`);
+    }
+    for (const story of removedStories) {
+      messages.push(`${story.formattedId} is no longer ready for validation.`);
+    }
+
+    if (messages.length === 0) {
+      return;
+    }
+
+    if (messages.length > 5) {
+      const ids = [...addedStories, ...removedStories].slice(0, 5).map((story) => story.formattedId).join(", ");
+      await this.postTeamsMessage(webhookUrl, `Testing required changed for: ${ids}${messages.length > 5 ? ", ..." : ""}`);
+      return;
+    }
+
+    for (const message of messages) {
+      await this.postTeamsMessage(webhookUrl, message);
+    }
+  }
+
   private async dispatchNotification(notification: {
     title: string;
     body: string;
@@ -73,6 +114,54 @@ export class NotificationEngine {
       autoCancel: false,
       ongoing: true
     });
+  }
+
+  private async postTeamsMessage(webhookUrl: string, text: string): Promise<void> {
+    const payload = { text };
+    try {
+      await this.postJson(webhookUrl, payload);
+    } catch (error) {
+      console.warn("Failed to send Teams notification", error);
+    }
+  }
+
+  private async postJson(url: string, payload: Record<string, unknown>): Promise<void> {
+    const body = JSON.stringify(payload);
+
+    if (isTauriAvailable()) {
+      try {
+        const response = await invoke<HttpResponse>("post_webhook", {
+          request: {
+            url,
+            body
+          }
+        });
+        if (response.status < 200 || response.status >= 300) {
+          throw new Error(`Webhook request failed (${response.status})`);
+        }
+        return;
+      } catch (error) {
+        if (!isLikelyTauriUnavailable(error)) {
+          throw error;
+        }
+      }
+    }
+
+    const response = await fetch(TEAMS_PROXY_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url, body })
+    });
+    if (!response.ok) {
+      throw new Error(`Teams proxy request failed (${response.status})`);
+    }
+
+    const proxyResponse = (await response.json()) as HttpResponse;
+    if (proxyResponse.status < 200 || proxyResponse.status >= 300) {
+      throw new Error(`Webhook request failed (${proxyResponse.status})`);
+    }
   }
 
   private async ensurePermission(): Promise<boolean> {
@@ -115,4 +204,16 @@ function isTauriAvailable(): boolean {
     return false;
   }
   return "__TAURI_INTERNALS__" in (window as unknown as Record<string, unknown>);
+}
+
+function isLikelyTauriUnavailable(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("tauri") &&
+    (message.includes("not available") || message.includes("not initialized") || message.includes("cannot read"))
+  );
 }

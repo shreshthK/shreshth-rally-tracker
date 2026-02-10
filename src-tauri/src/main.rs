@@ -16,6 +16,12 @@ struct RallyRequest {
     api_key: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct WebhookRequest {
+    url: String,
+    body: String,
+}
+
 #[derive(Debug, Serialize)]
 struct RallyResponse {
     status: u16,
@@ -69,6 +75,23 @@ async fn rally_request(request: RallyRequest) -> Result<RallyResponse, String> {
     Ok(RallyResponse { status, body })
 }
 
+#[tauri::command]
+async fn post_webhook(request: WebhookRequest) -> Result<RallyResponse, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(request.url)
+        .header("Content-Type", "application/json")
+        .body(request.body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status().as_u16();
+    let body = response.text().await.map_err(|e| e.to_string())?;
+
+    Ok(RallyResponse { status, body })
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
@@ -77,7 +100,8 @@ fn main() {
             set_api_key,
             get_api_key,
             delete_api_key,
-            rally_request
+            rally_request,
+            post_webhook
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

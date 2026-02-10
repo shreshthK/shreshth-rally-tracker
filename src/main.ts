@@ -88,6 +88,11 @@ appRoot.innerHTML = `
         <input id="api-key" required type="password" placeholder="_abc123..." />
       </label>
 
+      <label>
+        Teams webhook URL (optional)
+        <input id="teams-webhook-url" placeholder="https://.../webhook..." />
+      </label>
+
       <div class="inline-row">
         <label>
           Workspace
@@ -147,6 +152,7 @@ const testingTabButton = query<HTMLButtonElement>("#tab-testing");
 
 const baseUrlInput = query<HTMLInputElement>("#base-url");
 const apiKeyInput = query<HTMLInputElement>("#api-key");
+const teamsWebhookInput = query<HTMLInputElement>("#teams-webhook-url");
 const workspaceSelect = query<HTMLSelectElement>("#workspace-oid");
 const projectsSelect = query<HTMLSelectElement>("#project-oids");
 const sprintSelect = query<HTMLSelectElement>("#iteration-oid");
@@ -187,6 +193,7 @@ settingsOpen.addEventListener("click", () => {
 for (const input of [
   baseUrlInput,
   apiKeyInput,
+  teamsWebhookInput,
   workspaceSelect,
   projectsSelect,
   sprintSelect,
@@ -221,9 +228,15 @@ settingsForm.addEventListener("submit", async (event) => {
   const selectedIterationOid = sprintSelect.value;
   const selectedIteration = visibleSprints.find((iteration) => iteration.objectId === selectedIterationOid);
   const nextApiKey = apiKeyInput.value.trim();
+  const teamsWebhookUrl = normalizeOptionalUrl(teamsWebhookInput.value);
 
   if (!selectedIteration) {
     feedbackText.textContent = "Select a valid sprint.";
+    return;
+  }
+
+  if (teamsWebhookInput.value.trim().length > 0 && !teamsWebhookUrl) {
+    feedbackText.textContent = "Teams webhook URL must be a valid https URL.";
     return;
   }
 
@@ -242,6 +255,7 @@ settingsForm.addEventListener("submit", async (event) => {
       projectNames: selectedProjectNames,
       createdAt: new Date().toISOString(),
       baseUrl: baseUrlInput.value.trim(),
+      teamsWebhookUrl,
       workspaceOid: workspaceSelect.value,
       projectOids: selectedProjectOids,
       iterationOid: selectedIteration.objectId,
@@ -450,6 +464,7 @@ function openSettingsForNewTracker(): void {
 
   baseUrlInput.value = active?.baseUrl ?? DEFAULT_CONFIG.baseUrl;
   apiKeyInput.value = apiKey;
+  teamsWebhookInput.value = active?.teamsWebhookUrl ?? "";
   pollIntervalSelect.value = String(active?.pollIntervalMinutes ?? DEFAULT_CONFIG.pollIntervalMinutes);
 
   if (workspaces.length > 0) {
@@ -580,6 +595,11 @@ async function pollTracker(tracker: StoredTracker): Promise<void> {
       );
 
       await notificationEngine.notifyTestingRequiredChange(addedStories, removedStories);
+      await notificationEngine.notifyTeamsTestingRequiredChange(
+        addedStories,
+        removedStories,
+        tracker.teamsWebhookUrl
+      );
       trackerState.lastNotificationAt = new Date().toISOString();
     }
 
@@ -944,6 +964,7 @@ function buildConfigForForm(apiKeyValue: string, selectedProjects?: string[]): C
   return {
     baseUrl: baseUrlInput.value.trim() || DEFAULT_CONFIG.baseUrl,
     apiKey: apiKeyValue,
+    teamsWebhookUrl: normalizeOptionalUrl(teamsWebhookInput.value),
     workspaceOid: workspaceSelect.value,
     projectOids: selectedProjects ?? getSelectedValues(projectsSelect),
     iterationOid: sprintSelect.value,
@@ -1121,6 +1142,23 @@ function isTrackerErrorStatus(message: string | undefined): message is string {
     normalized.includes("unable") ||
     normalized.includes("authentication")
   );
+}
+
+function normalizeOptionalUrl(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:") {
+      return undefined;
+    }
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
 }
 
 function query<T extends HTMLElement>(selector: string): T {

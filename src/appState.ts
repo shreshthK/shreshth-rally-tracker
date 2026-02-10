@@ -170,6 +170,10 @@ function hydrateTracker(tracker: Partial<StoredTracker>, index: number): StoredT
         ? tracker.createdAt
         : new Date().toISOString(),
     baseUrl: tracker.baseUrl || DEFAULT_CONFIG.baseUrl,
+    teamsWebhookUrl:
+      typeof tracker.teamsWebhookUrl === "string" && tracker.teamsWebhookUrl.trim().length > 0
+        ? tracker.teamsWebhookUrl.trim()
+        : undefined,
     workspaceOid: tracker.workspaceOid,
     projectOids,
     projectNames,
@@ -206,6 +210,10 @@ function hydrateLegacyTracker(
     projectNames: [],
     createdAt: new Date().toISOString(),
     baseUrl: legacy.baseUrl || DEFAULT_CONFIG.baseUrl,
+    teamsWebhookUrl:
+      typeof legacy.teamsWebhookUrl === "string" && legacy.teamsWebhookUrl.trim().length > 0
+        ? legacy.teamsWebhookUrl.trim()
+        : undefined,
     workspaceOid: legacy.workspaceOid,
     projectOids,
     iterationOid: legacy.iterationOid,

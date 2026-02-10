@@ -1,6 +1,7 @@
 export interface Config {
   baseUrl: string;
   apiKey: string;
+  teamsWebhookUrl?: string;
   workspaceOid: string;
   projectOids: string[];
   iterationOid: string;

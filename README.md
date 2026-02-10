@@ -17,6 +17,7 @@ Local desktop notifier for Rally **story updates** scoped to one or more selecte
 - Uses Rally Lookback API for change events
 - Uses WSAPI for current story/sprint/project metadata
 - Sends native desktop notifications
+- Optional Microsoft Teams webhook notifications for testing-required changes
 - Stores API key in macOS Keychain (via Rust `keyring`)
 
 ## Rally requirements
@@ -43,6 +44,7 @@ npm run tauri dev
 
 - Enter Rally base URL (usually `https://rally1.rallydev.com`)
 - Enter API key
+- (Optional) Enter Teams Incoming Webhook URL
 - Load/select workspace
 - Load/select one or more projects
 - Load/select sprint from dropdown
