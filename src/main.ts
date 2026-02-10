@@ -64,9 +64,9 @@ appRoot.innerHTML = `
     </section>
 
     <section class="tabs">
-      <button id="tab-stories" class="chip chip-active">Current Stories</button>
+      <button id="tab-testing" class="chip chip-active">Testing Required</button>
+      <button id="tab-stories" class="chip">Current Stories</button>
       <button id="tab-all" class="chip">Logs</button>
-      <button id="tab-testing" class="chip">Testing Required</button>
     </section>
 
     <section>
@@ -169,7 +169,7 @@ let appState: PersistedState = loadPersistedState();
 let apiKey = "";
 let pollingTimer: number | null = null;
 let pollInFlight = false;
-let activeTab: ActiveTab = "stories";
+let activeTab: ActiveTab = "testing";
 const BROWSER_API_KEY_STORAGE = "rally-notifier-api-key";
 
 let workspaces: WorkspaceOption[] = [];
