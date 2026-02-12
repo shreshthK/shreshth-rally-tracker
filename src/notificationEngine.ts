@@ -67,9 +67,15 @@ export class NotificationEngine {
     teamsWebhookUrl?: string
   ): Promise<void> {
     const webhookUrl = teamsWebhookUrl?.trim();
+    console.log("Teams notify: webhook set", Boolean(webhookUrl));
     if (!webhookUrl) {
       return;
     }
+
+    console.log("Teams notify: added/removed counts", {
+      added: addedStories.length,
+      removed: removedStories.length
+    });
 
     const messages: string[] = [];
     for (const story of addedStories) {
@@ -80,6 +86,7 @@ export class NotificationEngine {
     }
 
     if (messages.length === 0) {
+      console.log("Teams notify: no messages to send");
       return;
     }
 
@@ -117,8 +124,9 @@ export class NotificationEngine {
   }
 
   private async postTeamsMessage(webhookUrl: string, text: string): Promise<void> {
-    const payload = { text };
+    const payload = buildTeamsAdaptiveCardPayload(text);
     try {
+      console.log("Teams notify: sending message", { text });
       await this.postJson(webhookUrl, payload);
     } catch (error) {
       console.warn("Failed to send Teams notification", error);
@@ -127,6 +135,11 @@ export class NotificationEngine {
 
   private async postJson(url: string, payload: Record<string, unknown>): Promise<void> {
     const body = JSON.stringify(payload);
+    const byteLength = new TextEncoder().encode(body).length;
+    console.log("Teams notify: payload size", { byteLength });
+    if (byteLength > 256 * 1024) {
+      throw new Error(`Webhook payload too large (${byteLength} bytes)`);
+    }
 
     if (isTauriAvailable()) {
       try {
@@ -135,6 +148,10 @@ export class NotificationEngine {
             url,
             body
           }
+        });
+        console.log("Teams notify: webhook response", {
+          status: response.status,
+          body: response.body
         });
         if (response.status < 200 || response.status >= 300) {
           throw new Error(`Webhook request failed (${response.status})`);
@@ -159,6 +176,10 @@ export class NotificationEngine {
     }
 
     const proxyResponse = (await response.json()) as HttpResponse;
+    console.log("Teams notify: proxy response", {
+      status: proxyResponse.status,
+      body: proxyResponse.body
+    });
     if (proxyResponse.status < 200 || proxyResponse.status >= 300) {
       throw new Error(`Webhook request failed (${proxyResponse.status})`);
     }
@@ -197,6 +218,30 @@ export class NotificationEngine {
     this.permissionReady = permissionGranted;
     return permissionGranted;
   }
+}
+
+function buildTeamsAdaptiveCardPayload(text: string): Record<string, unknown> {
+  return {
+    type: "message",
+    attachments: [
+      {
+        contentType: "application/vnd.microsoft.card.adaptive",
+        contentUrl: null,
+        content: {
+          $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+          type: "AdaptiveCard",
+          version: "1.4",
+          body: [
+            {
+              type: "TextBlock",
+              text,
+              wrap: true
+            }
+          ]
+        }
+      }
+    ]
+  };
 }
 
 function isTauriAvailable(): boolean {
